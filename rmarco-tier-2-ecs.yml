@@ -1,0 +1,288 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Apper DevOps Engineer Technical Challenge - Raphael Marco - Tier 2 - ECS"
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: "raphael-marco-tier-2"
+
+  Environment:
+    Type: String
+    Default: "dev"
+
+  VpcStackName:
+    Type: String
+
+  RdsStackName:
+    Type: String
+
+Resources:
+  # Start container repository
+
+  ExpressMinAppContainerRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      ImageTagMutability: "MUTABLE"
+      RepositoryName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  ExpressMinAppContainerRepositoryReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-ecr-read" ] ]
+      Description: "Used to allow read access to express-minapp ECR"
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - "ecr:DescribeImages"
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:ListImages"
+            Resource: !GetAtt ExpressMinAppContainerRepository.Arn
+
+  ExpressMinAppContainerRepositoryWritePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-ecr-write" ] ]
+      Description: "Used to allow write access to express-minapp ECR"
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - "ecr:PutImage"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:UploadLayerPart"
+              - "ecr:CompleteLayerUpload"
+            Resource: !GetAtt ExpressMinAppContainerRepository.Arn
+
+  ContainerRepositoryCorePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "ecr-core" ] ]
+      Description: "Used to allow core policies such as GetAuthorizationToken to ECR"
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - "ecr:GetAuthorizationToken"
+            Resource: "*"
+
+  # End container repository
+
+  # Start security groups
+
+  ExpressMinAppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${VpcStackName}-VpcId"
+      GroupName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-ecs" ] ]
+      GroupDescription: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-ecs" ] ]
+      SecurityGroupEgress:
+        - Description: "Allow to anywhere"
+          CidrIp: "0.0.0.0/0"
+          IpProtocol: "-1"
+          FromPort: 1
+          ToPort: 65535
+      SecurityGroupIngress:
+        - Description: "Allow from vpc"
+          CidrIp:
+            Fn::ImportValue:
+              !Sub "${VpcStackName}-VpcCidrBlock"
+          IpProtocol: "tcp"
+          FromPort: 1337
+          ToPort: 1337
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-ecs" ] ]
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # End security groups
+
+  # Start ECS
+
+  MainEcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Join [ "-", [ !Ref ProjectName, !Ref Environment ] ]
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment ] ]
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  ExpressMinAppEcsService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !GetAtt MainEcsCluster.Arn
+      ServiceName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
+      LaunchType: "FARGATE"
+      DesiredCount: 2
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !Ref ExpressMinAppSecurityGroup
+          Subnets:
+            - Fn::ImportValue:
+                !Sub "${VpcStackName}-VpcSubnetPrivate1Id"
+            - Fn::ImportValue:
+                !Sub "${VpcStackName}-VpcSubnetPrivate2Id"
+      LoadBalancers:
+        - ContainerName: "web"
+          ContainerPort: 1337
+          TargetGroupArn: !Ref ExpressMinAppAlbTargetGroup
+      TaskDefinition: !Ref ExpressMinAppEcsTaskDefinition
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  ExpressMinAppEcsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        - Name: "web"
+          Image: !Join [ "", [ !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/", !Ref ExpressMinAppContainerRepository, ":latest" ] ]
+          PortMappings:
+            - ContainerPort: 1337
+          Environment:
+            - Name: "HOST"
+              Value:
+                Fn::ImportValue:
+                  !Sub "${RdsStackName}-MasterDbAddress"
+            - Name: "USERNAME"
+              Value: !Join [ "", [ "{{resolve:secretsmanager:", Fn::ImportValue: !Sub "${RdsStackName}-MasterDbCredentials", "::username}}" ] ]
+            - Name: "PASSWORD"
+              Value: !Join [ "", [ "{{resolve:secretsmanager:", Fn::ImportValue: !Sub "${RdsStackName}-MasterDbCredentials", "::password}}" ] ]
+            - Name: "DATABASE"
+              Value: "master"
+      Cpu: "512"
+      Memory: "1024"
+      RequiresCompatibilities:
+        - "FARGATE"
+      NetworkMode: "awsvpc"
+      ExecutionRoleArn: !GetAtt ExpressMinAppEcsExecutionRole.Arn
+
+  ExpressMinAppEcsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-ecs-execution-role" ] ]
+      Description: "Execution role for express-minapp ECS service"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - !Ref ContainerRepositoryCorePolicy
+        - !Ref ExpressMinAppContainerRepositoryReadPolicy
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-ecs-execution-role" ] ]
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # End ECS
+
+  # Start load balancer
+
+  ExpressMinAppAlb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "app" ] ]
+      SubnetMappings:
+        - SubnetId:
+            Fn::ImportValue:
+                !Sub "${VpcStackName}-VpcSubnetPublic1Id"
+        - SubnetId:
+            Fn::ImportValue:
+                !Sub "${VpcStackName}-VpcSubnetPublic2Id"
+      SecurityGroups:
+        - !Ref ExpressMinAppAlbSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  ExpressMinAppAlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${VpcStackName}-VpcId"
+      GroupName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-alb" ] ]
+      GroupDescription: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-alb" ] ]
+      SecurityGroupIngress:
+        - Description: "Allow http from anywhere"
+          CidrIp: "0.0.0.0/0"
+          IpProtocol: "tcp"
+          FromPort: 80
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-alb" ] ]
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  ExpressMinAppAlbListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ExpressMinAppAlb
+      DefaultActions:
+        - Type: "forward"
+          TargetGroupArn: !Ref ExpressMinAppAlbTargetGroup
+      Port: 80
+      Protocol: "HTTP"
+
+  ExpressMinAppAlbTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "app" ] ]
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${VpcStackName}-VpcId"
+      HealthCheckEnabled: True
+      HealthCheckPath: /health
+      Port: 1337
+      Protocol: "HTTP"
+      TargetType: "ip"
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # End load balancer
