@@ -28,4 +28,8 @@ Tag values must also follow the naming convention specified above.
 
 ## Stack Creation Order
 
-1. wip
+1. [rmarco-tier-2-vpc.yml](rmarco-tier-2-vpc.yml)
+2. [rmarco-tier-2-rds.yml](rmarco-tier-2-rds.yml)
+3. [rmarco-tier-2-ecs.yml](rmarco-tier-2-ecs.yml)
+4. [rmarco-tier-2-cicd.yml](rmarco-tier-2-cicd.yml)
+5. [rmarco-tier-2-cloudfront.yml](rmarco-tier-2-cloudfront.yml)
