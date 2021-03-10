@@ -97,7 +97,7 @@ Resources:
         Type: "CODEPIPELINE"
       LogsConfig:
         CloudWatchLogs:
-          GroupName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
+          GroupName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-project" ] ]
           Status: "ENABLED"
           StreamName: "default"
       ServiceRole: !Ref ExpressMinAppProjectServiceRole
@@ -117,7 +117,7 @@ Resources:
   ExpressMinAppCloudwatchPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-cloudwatch" ] ]
+      ManagedPolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-project-cloudwatch" ] ]
       Description: "Used to allow access to express-minapp cloudwatch"
       PolicyDocument:
         Version: 2012-10-17
@@ -130,11 +130,11 @@ Resources:
             Resource:
               - !Join [ "", [
                   !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:",
-                  !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
+                  !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-project" ] ]
                 ] ]
               - !Join [ "", [
                   !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:",
-                  !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ],
+                  !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-project" ] ],
                   ":*"
                 ] ]
 
