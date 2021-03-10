@@ -47,22 +47,22 @@ Resources:
       EnableDnsHostnames: True
       EnableDnsSupport: True
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "vpc" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   VpcInternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "ig" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   VpcToVpcInternetGateway:
@@ -82,11 +82,11 @@ Resources:
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       MapPublicIpOnLaunch: False
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "database-1" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   # Database subnet in second region availability zone
@@ -98,11 +98,11 @@ Resources:
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       MapPublicIpOnLaunch: False
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "database-2" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   # End database subnet
@@ -118,11 +118,11 @@ Resources:
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       MapPublicIpOnLaunch: False
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "private-1" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   # Private subnet in second region availability zone
@@ -134,11 +134,11 @@ Resources:
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       MapPublicIpOnLaunch: False
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "private-2" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   # Route table for private subnets
@@ -147,11 +147,11 @@ Resources:
     Properties:
       VpcId: !Ref Vpc
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "private" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   VpcSubnetPrivate1RouteTable:
@@ -202,6 +202,19 @@ Resources:
         - !Ref VpcSubnetPrivate1
         - !Ref VpcSubnetPrivate2
 
+  VpcEndpointToLogs:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      PrivateDnsEnabled: True
+      VpcEndpointType: "Interface"
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+      SubnetIds:
+        - !Ref VpcSubnetPrivate1
+        - !Ref VpcSubnetPrivate2
+
   # End private subnet
 
   # Start public subnet
@@ -215,11 +228,11 @@ Resources:
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       MapPublicIpOnLaunch: True
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "public-1" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   # Public subnet in the second region availability zone
@@ -231,11 +244,11 @@ Resources:
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       MapPublicIpOnLaunch: True
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "public-2" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   # Route table for public subnets
@@ -244,11 +257,11 @@ Resources:
     Properties:
       VpcId: !Ref Vpc
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "public" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   VpcSubnetPublic1ToVpcRouteTablePublic:
@@ -274,11 +287,11 @@ Resources:
   #  Type: AWS::EC2::EIP
   #  Properties:
   #     Tags:
-  #       - Key: Name
+  #       - Key: "Name"
   #         Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "public-1" ] ]
-  #       - Key: Project
+  #       - Key: "Project"
   #         Value: !Ref ProjectName
-  #       - Key: Environment
+  #       - Key: "Environment"
   #         Value: !Ref Environment
 
   # NatGatewayPublic1:
@@ -287,22 +300,22 @@ Resources:
   #     SubnetId: !Ref VpcSubnetPublic1
   #     AllocationId: !GetAtt EipPublic1.AllocationId
   #     Tags:
-  #       - Key: Name
+  #       - Key: "Name"
   #         Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "public-1" ] ]
-  #       - Key: Project
+  #       - Key: "Project"
   #         Value: !Ref ProjectName
-  #       - Key: Environment
+  #       - Key: "Environment"
   #         Value: !Ref Environment
 
   # EipPublic2:
   #  Type: AWS::EC2::EIP
   #  Properties:
   #     Tags:
-  #       - Key: Name
+  #       - Key: "Name"
   #         Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "public-2" ] ]
-  #       - Key: Project
+  #       - Key: "Project"
   #         Value: !Ref ProjectName
-  #       - Key: Environment
+  #       - Key: "Environment"
   #         Value: !Ref Environment
 
   # NatGatewayPublic2:
@@ -311,11 +324,11 @@ Resources:
   #     SubnetId: !Ref VpcSubnetPublic2
   #     AllocationId: !GetAtt EipPublic2.AllocationId
   #     Tags:
-  #       - Key: Name
+  #       - Key: "Name"
   #         Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "public-2" ] ]
-  #       - Key: Project
+  #       - Key: "Project"
   #         Value: !Ref ProjectName
-  #       - Key: Environment
+  #       - Key: "Environment"
   #         Value: !Ref Environment
 
   # End public subnet
@@ -346,11 +359,11 @@ Resources:
           FromPort: 0
           ToPort: 65535
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "endpoint" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
 Outputs:

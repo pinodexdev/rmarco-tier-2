@@ -25,11 +25,11 @@ Resources:
       ImageTagMutability: "MUTABLE"
       RepositoryName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   ExpressMinAppContainerRepositoryReadPolicy:
@@ -40,7 +40,7 @@ Resources:
       PolicyDocument:
         Version: 2012-10-17
         Statement:
-          - Effect: Allow
+          - Effect: "Allow"
             Action:
               - "ecr:DescribeImages"
               - "ecr:GetDownloadUrlForLayer"
@@ -57,7 +57,7 @@ Resources:
       PolicyDocument:
         Version: 2012-10-17
         Statement:
-          - Effect: Allow
+          - Effect: "Allow"
             Action:
               - "ecr:PutImage"
               - "ecr:InitiateLayerUpload"
@@ -73,7 +73,7 @@ Resources:
       PolicyDocument:
         Version: 2012-10-17
         Statement:
-          - Effect: Allow
+          - Effect: "Allow"
             Action:
               - "ecr:GetAuthorizationToken"
             Resource: "*"
@@ -105,11 +105,11 @@ Resources:
           FromPort: 1337
           ToPort: 1337
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-ecs" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   # End security groups
@@ -120,12 +120,15 @@ Resources:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Join [ "-", [ !Ref ProjectName, !Ref Environment ] ]
+      ClusterSettings:
+        - Name: "containerInsights"
+          Value: "enabled"
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   ExpressMinAppEcsService:
@@ -150,16 +153,17 @@ Resources:
           TargetGroupArn: !Ref ExpressMinAppAlbTargetGroup
       TaskDefinition: !Ref ExpressMinAppEcsTaskDefinition
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   ExpressMinAppEcsTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
+      Family: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
       ContainerDefinitions:
         - Name: "web"
           Image: !Join [ "", [ !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/", !Ref ExpressMinAppContainerRepository, ":latest" ] ]
@@ -176,12 +180,25 @@ Resources:
               Value: !Join [ "", [ "{{resolve:secretsmanager:", Fn::ImportValue: !Sub "${RdsStackName}-MasterDbCredentials", "::password}}" ] ]
             - Name: "DATABASE"
               Value: "master"
+          # LogConfiguration:
+          #   LogDriver: "awslogs"
+          #   Options:
+          #     awslogs-group: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
+          #     awslogs-region: !Sub "${AWS::Region}}"
+          #     awslogs-stream-prefix: "web"
       Cpu: "512"
       Memory: "1024"
       RequiresCompatibilities:
         - "FARGATE"
       NetworkMode: "awsvpc"
       ExecutionRoleArn: !GetAtt ExpressMinAppEcsExecutionRole.Arn
+      Tags:
+        - Key: "Name"
+          Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
+        - Key: "Project"
+          Value: !Ref ProjectName
+        - Key: "Environment"
+          Value: !Ref Environment
 
   ExpressMinAppEcsExecutionRole:
     Type: AWS::IAM::Role
@@ -191,22 +208,81 @@ Resources:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Effect: Allow
+          - Effect: "Allow"
             Principal:
               Service:
-                - ecs-tasks.amazonaws.com
+                - "ecs-tasks.amazonaws.com"
             Action:
-              - 'sts:AssumeRole'
+              - "sts:AssumeRole"
       ManagedPolicyArns:
         - !Ref ContainerRepositoryCorePolicy
         - !Ref ExpressMinAppContainerRepositoryReadPolicy
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-ecs-execution-role" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
+
+  ExpressMinAppEcsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-ecs" ] ]
+      Description: "Used to allow access to express-minapp ECS cluster and service"
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: "Allow"
+            Action: "ecs:*"
+            Resource:
+              - "*" # TODO: narrow policy to specific resources
+          - Effect: "Allow"
+            Action: "iam:PassRole"
+            Resource: "*"
+
+  ExpressMinAppScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
+      PolicyType: "TargetTrackingScaling"
+      ScalingTargetId: !Ref ExpressMinAppScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: "ECSServiceAverageCPUUtilization"
+        ScaleInCooldown: 15
+        ScaleOutCooldown: 15
+        TargetValue: 50
+
+  ExpressMinAppScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      ResourceId: !Join [ "/", [
+        "service",
+        !Join [ "-", [ !Ref ProjectName, !Ref Environment ] ], # cluster name
+        !GetAtt ExpressMinAppEcsService.Name
+      ] ]
+      ServiceNamespace: "ecs"
+      ScalableDimension: "ecs:service:DesiredCount"
+      MinCapacity: 2
+      MaxCapacity: 10
+      RoleARN: !GetAtt ExpressMinAppScalingRole.Arn
+
+  ExpressMinAppScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-scaling" ] ]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ecs-tasks.amazonaws.com"
+            Action:
+                - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole"
 
   # End ECS
 
@@ -226,11 +302,11 @@ Resources:
       SecurityGroups:
         - !Ref ExpressMinAppAlbSecurityGroup
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   ExpressMinAppAlbSecurityGroup:
@@ -248,11 +324,11 @@ Resources:
           FromPort: 80
           ToPort: 80
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp-alb" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   ExpressMinAppAlbListener:
@@ -278,11 +354,60 @@ Resources:
       Protocol: "HTTP"
       TargetType: "ip"
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "express-minapp" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   # End load balancer
+
+Outputs:
+  MainEcsClusterName:
+    Description: "Cluster name"
+    Value: !Ref MainEcsCluster
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "MainEcsClusterName" ] ]
+
+  ExpressMinAppEcsServiceName:
+    Description: "express-minapp service name"
+    Value: !Ref ExpressMinAppEcsService
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "ExpressMinAppEcsServiceName" ] ]
+
+  ExpressMinAppEcsPolicyArn:
+    Description: "Access policy for express-minapp ECS cluster and service"
+    Value: !Ref ExpressMinAppEcsPolicy
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "ExpressMinAppEcsPolicyArn" ] ]
+
+  ExpressMinAppContainerRepositoryReadPolicyArn:
+    Description: "Read policy for express-minapp ECR repository"
+    Value: !Ref ExpressMinAppContainerRepositoryReadPolicy
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "ExpressMinAppContainerRepositoryReadPolicyArn" ] ]
+
+  ExpressMinAppContainerRepositoryWritePolicyArn:
+    Description: "Read policy for express-minapp ECR repository"
+    Value: !Ref ExpressMinAppContainerRepositoryWritePolicy
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "ExpressMinAppContainerRepositoryWritePolicyArn" ] ]
+
+  ContainerRepositoryCorePolicyArn:
+    Description: "Read policy for express-minapp ECR repository"
+    Value: !Ref ContainerRepositoryCorePolicy
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "ContainerRepositoryCorePolicyArn" ] ]
+
+  ExpressMinAppContainerRepositoryName:
+    Description: "express-minapp ECR repository name"
+    Value: !Ref ExpressMinAppContainerRepository
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "ExpressMinAppContainerRepositoryName" ] ]
+
+  ExpressMinAppAlbDnsName:
+    Description: "express-minapp load balancer DNS name"
+    Value: !GetAtt ExpressMinAppAlb.DNSName
+    Export:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "ExpressMinAppAlbDnsName" ] ]

@@ -45,11 +45,11 @@ Resources:
       DeletionProtection: False
 
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "master" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   MasterDbCredentials:
@@ -62,11 +62,11 @@ Resources:
         PasswordLength: 24
         ExcludeCharacters: '"@/\'
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "master-db" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   MasterDbSubnetGroup:
@@ -79,11 +79,11 @@ Resources:
          - Fn::ImportValue:
             !Sub "${VpcStackName}-VpcSubnetDatabase2Id"
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "master" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
   MasterDbCredentialsToMasterDb:
@@ -101,8 +101,6 @@ Resources:
           !Sub "${VpcStackName}-VpcId"
       GroupName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "master" ] ]
       GroupDescription: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "master" ] ]
-      # SecurityGroupEgress:
-      #   - Egress
       SecurityGroupIngress:
         - Description: "Allow MySQL port from vpc subnet"
           CidrIp:
@@ -112,11 +110,11 @@ Resources:
           FromPort: 3306
           ToPort: 3306
       Tags:
-        - Key: Name
+        - Key: "Name"
           Value: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "master" ] ]
-        - Key: Project
+        - Key: "Project"
           Value: !Ref ProjectName
-        - Key: Environment
+        - Key: "Environment"
           Value: !Ref Environment
 
 Outputs:
